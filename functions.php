@@ -15,8 +15,8 @@ add_action('after_setup_theme', 'thyme_theme_setup');
 function thyme_enqueue_assets() {
     wp_deregister_style('wp-block-library');
     wp_enqueue_style('thyme-style', get_template_directory_uri() . '/style.css', [], filemtime(get_template_directory() . '/style.css'));
+    wp_enqueue_style('fontawesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', [], '6.4.0');
     wp_enqueue_script('faq-script', get_template_directory_uri() . '/js/faq.js', ['jquery'], '1.0', true);
-    wp_enqueue_script('thyme-js', get_template_directory_uri() . '/assets/js/main.js', [], '1.0', true);
 }
 add_action('wp_enqueue_scripts', 'thyme_enqueue_assets');
 
@@ -24,7 +24,8 @@ add_action('wp_enqueue_scripts', 'thyme_enqueue_assets');
 
 function thyme_register_menus() {
     register_nav_menus([
-        'main_menu' => __('main menu', 'thyme')
+        'main_menu' => __('main menu', 'thyme'),
+        'footer_menu' => __('footer menu', 'thyme')
     ]);
 }
 add_action('init', 'thyme_register_menus');
@@ -72,19 +73,19 @@ function thyme_remove_wp_version() {
 add_filter('the_generator', 'thyme_remove_wp_version');
 
 function thyme_limit_login_attempts($user, $password) {
-    $attempts = get_transient('failed_login_attempts') ?: 0;
-
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $attempts = get_transient('failed_login_attempts_' . $ip) ?: 0;
     if ($attempts >= 5) {
-        return new WP_Error('too_many_attempts', 'too many failed login attempts try again later.');
+        return new WP_Error('too_many_attempts', __('too much tries, try later', 'thyme'));
     }
-
     return $user;
 }
 add_filter('wp_authenticate_user', 'thyme_limit_login_attempts', 30, 2);
 
-function thyme_failed_login() {
-    $attempts = get_transient('failed_login_attempts') ?: 0;
-    set_transient('failed_login_attempts', $attempts + 1, 600);
+function thyme_failed_login($username) {
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $attempts = get_transient('failed_login_attempts_' . $ip) ?: 0;
+    set_transient('failed_login_attempts_' . $ip, $attempts + 1, 600);
 }
 add_action('wp_login_failed', 'thyme_failed_login');
 
@@ -155,3 +156,21 @@ function thyme_create_demo_posts() {
     }
 }
 add_action('after_setup_theme', 'thyme_create_demo_posts');
+
+// Gestion du formulaire de newsletter
+add_action('init', function() {
+    if (
+        isset($_POST['thyme_newsletter_email'], $_POST['thyme_newsletter_nonce']) &&
+        wp_verify_nonce($_POST['thyme_newsletter_nonce'], 'thyme_newsletter')
+    ) {
+        $email = sanitize_email($_POST['thyme_newsletter_email']);
+        if (!is_email($email)) {
+            set_transient('thyme_newsletter_message', __('Adresse email invalide.', 'thyme'), 30);
+        } else {
+            // Ici, tu pourrais ajouter l'email à une liste, envoyer un mail, etc.
+            set_transient('thyme_newsletter_message', __('Merci pour votre inscription !', 'thyme'), 30);
+        }
+        wp_redirect($_SERVER['REQUEST_URI']);
+        exit;
+    }
+});
