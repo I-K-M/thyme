@@ -1,4 +1,3 @@
-<?php // FontAwesome est chargé via functions.php pour les icônes. ?>
 <?php get_header(); ?>
 
 <main class="site-content">
